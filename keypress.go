@@ -1,9 +1,5 @@
 // keypress reads a list of keystrokes from standard input
 // to emulate
-//
-// echo hello{TAB}world | keypress
-// echo !{F4} | keypress
-// echo #r|keypress
 package main
 
 import (
@@ -13,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"unsafe"
+	"flag"
+	"time"
 )
 
 var (
@@ -63,8 +61,17 @@ func Send(in []Key) (err error) {
 	return err
 }
 
+var(
+	I = flag.Duration("i", 150*time.Millisecond, "one-time initialization delay")
+)
+
+func init(){
+	flag.Parse()
+}
+
 func main() {
 	buf := make([]Key, 0, 128)
+	time.Sleep(*I)
 	for sc := bufio.NewScanner(os.Stdin); sc.Scan(); {
 		ln := sc.Bytes()
 		if len(ln) == 0 {
