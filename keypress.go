@@ -4,13 +4,20 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/binary"
+	"flag"
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
-	"unsafe"
-	"flag"
+	"syscall"
 	"time"
+
+	"unsafe"
+
+	"github.com/as/cursor"
 )
 
 var (
@@ -23,8 +30,11 @@ var (
 		flags: FlagUp,
 	}
 )
-var Input Key
-var InputL = int(unsafe.Sizeof(Input))
+var (
+	Input  Key
+	M      Mouse
+	InputL = int(unsafe.Sizeof(Input))
+)
 
 type Flag int32
 
@@ -38,6 +48,23 @@ type Key struct {
 	extra uintptr // 8
 	_     [2]byte
 }
+type Mouse struct {
+	kind   int32
+	x      int32 // 4
+	y      int32 // 4	// good
+	data   int32 // 4
+	flag   int32 // 4
+	time   int32 // 4
+	extra1 int64 // 8
+	r1     [8]byte
+}
+
+const (
+	HookKbd      = 2
+	HookKbdLow   = 13
+	HookMouse    = 7
+	HookMouseLow = 14
+)
 
 const (
 	KindKeyboard = 1
@@ -50,6 +77,14 @@ const (
 	FlagScanCode      = 8 // scan identifies; wVk ignored.
 	FlagUnicode       = 4 //
 )
+const (
+	MouseAbs   = 0x8000 // Packers dont use absolute coordinates by default
+	MouseMoved = 0x0001 // A movement occured, but was it _desired_?
+)
+
+func init() {
+	println(unsafe.Sizeof(M))
+}
 
 //sys	SendInput(nin int, in uintptr, inlen int) (err error) = user32.SendInput
 func Send(in []Key) (err error) {
@@ -60,16 +95,102 @@ func Send(in []Key) (err error) {
 	)
 	return err
 }
+func SendMouse(in []Mouse) (err error) {
+	buf := bytes.NewBuffer(make([]byte, 0))
+	x := in[0]
+	binary.Write(buf, binary.LittleEndian, x.kind)
+	binary.Write(buf, binary.LittleEndian, x.kind)
+	binary.Write(buf, binary.LittleEndian, x.x)
+	binary.Write(buf, binary.LittleEndian, x.y)
+	binary.Write(buf, binary.LittleEndian, x.data)
+	binary.Write(buf, binary.LittleEndian, x.flag)
+	binary.Write(buf, binary.LittleEndian, x.time)
+	binary.Write(buf, binary.LittleEndian, x.extra1)
+	binary.Write(buf, binary.LittleEndian, []byte("\x00\x00\x00\x00"))
+	log.Println(len(buf.Bytes()))
+	err = SendInput(
+		len(in),
+		uintptr(unsafe.Pointer(&(buf.Bytes()[0]))),
+		40,
+	)
+	return err
+}
 
-var(
+var (
 	I = flag.Duration("i", 150*time.Millisecond, "one-time initialization delay")
+	m = flag.Bool("m", false, "mouse")
+	r = flag.Bool("r", false, "relative coordinates")
+	w = flag.Bool("w", false, "write")
 )
 
-func init(){
+func init() {
 	flag.Parse()
 }
 
+func mouse() {
+	time.Sleep(*I)
+	for sc := bufio.NewScanner(os.Stdin); sc.Scan(); {
+		ln := len(sc.Bytes())
+		if ln == 0 {
+			continue
+		}
+		if ln != 49 {
+			println(ln)
+			continue
+		}
+		x, y, btn, ms, err := cursor.ReadString(sc.Text())
+		if err != nil {
+			log.Println(err)
+		}
+		log.Println(cursor.ReadString(sc.Text()))
+		btn = btn
+		fl := int32(btn)
+		fl = 0
+		m := int32(1)
+		if btn == 1 && !*r {
+			fl = 0x8000
+			m *= 10
+		}
+		println(btn)
+		err = SendMouse([]Mouse{
+			Mouse{
+				kind: KindMouse,
+				x:    int32(x) * m,
+				y:    int32(y) * m,
+				flag: fl | int32(btn),
+				time: int32(ms),
+			},
+		})
+		if err != nil {
+			log.Printf("Send: %s\n", err)
+		}
+	}
+}
+var cb = func(ncode int, wp int64, lp int) uintptr {
+
+				fd, _ := os.Create(`C:\users\as\proc.txt`)
+				fmt.Fprintln(fd,ncode, wp, lp)
+				log.Println( ncode, wp, lp)
+				fd.Close()
+				syscall.Syscall(404, 1, 0, 0, 0)
+				return 0
+			}
 func main() {
+	if *w {
+		runtime.LockOSThread()
+		log.Println(SetWindowsHookEx(HookMouseLow, syscall.NewCallbackCDecl(cb), 0, 0))
+		for {
+		}
+		return
+	}
+	if *m {
+		mouse()
+	} else {
+		key()
+	}
+}
+func key() {
+	panic("no")
 	buf := make([]Key, 0, 128)
 	time.Sleep(*I)
 	for sc := bufio.NewScanner(os.Stdin); sc.Scan(); {
@@ -127,9 +248,9 @@ func Lookup(expr BraceExpr) (keys []Key, err error) {
 
 var special = map[byte]VK{
 	'#': VK_LWIN,
-	'!': VK_LMENU,
+	'!': VK_RMENU,
 	'^': VK_CONTROL,
-	'+': VK_LSHIFT,
+	'+': VK_RSHIFT,
 }
 
 var keynames = map[string]VK{

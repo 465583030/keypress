@@ -38,12 +38,23 @@ func errnoErr(e syscall.Errno) error {
 
 var (
 	moduser32 = windows.NewLazySystemDLL("user32.dll")
-
+	procSetWindowsHookEx  = moduser32.NewProc("SetWindowsHookExA")
 	procSendInput = moduser32.NewProc("SendInput")
 )
 
 func SendInput(nin int, in uintptr, inlen int) (err error) {
 	r1, _, e1 := syscall.Syscall(procSendInput.Addr(), 3, uintptr(nin), uintptr(in), uintptr(inlen))
+	if r1 == 0 {
+		if e1 != 0 {
+			err = errnoErr(e1)
+		} else {
+			err = syscall.EINVAL
+		}
+	}
+	return
+}
+func SetWindowsHookEx(id int, proc uintptr, hmod uintptr, tid int)(err error){
+	r1, _, e1 := syscall.Syscall6(procSetWindowsHookEx.Addr(), 4, uintptr(id), proc, hmod, uintptr(tid), 0, 0)
 	if r1 == 0 {
 		if e1 != 0 {
 			err = errnoErr(e1)
