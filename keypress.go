@@ -107,7 +107,7 @@ func SendMouse(in []Mouse) (err error) {
 	binary.Write(buf, binary.LittleEndian, x.time)
 	binary.Write(buf, binary.LittleEndian, x.extra1)
 	binary.Write(buf, binary.LittleEndian, []byte("\x00\x00\x00\x00"))
-	log.Println(len(buf.Bytes()))
+//	log.Println(len(buf.Bytes()))
 	err = SendInput(
 		len(in),
 		uintptr(unsafe.Pointer(&(buf.Bytes()[0]))),
