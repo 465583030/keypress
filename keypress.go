@@ -107,7 +107,7 @@ func SendMouse(in []Mouse) (err error) {
 	binary.Write(buf, binary.LittleEndian, x.time)
 	binary.Write(buf, binary.LittleEndian, x.extra1)
 	binary.Write(buf, binary.LittleEndian, []byte("\x00\x00\x00\x00"))
-//	log.Println(len(buf.Bytes()))
+	//	log.Println(len(buf.Bytes()))
 	err = SendInput(
 		len(in),
 		uintptr(unsafe.Pointer(&(buf.Bytes()[0]))),
@@ -153,7 +153,7 @@ func mouse() {
 		}
 		println(btn)
 		err = SendMouse([]Mouse{
-			Mouse{
+			{
 				kind: KindMouse,
 				x:    int32(x) * m,
 				y:    int32(y) * m,
@@ -166,15 +166,17 @@ func mouse() {
 		}
 	}
 }
+
 var cb = func(ncode int, wp int64, lp int) uintptr {
 
-				fd, _ := os.Create(`C:\users\as\proc.txt`)
-				fmt.Fprintln(fd,ncode, wp, lp)
-				log.Println( ncode, wp, lp)
-				fd.Close()
-				syscall.Syscall(404, 1, 0, 0, 0)
-				return 0
-			}
+	fd, _ := os.Create(`C:\users\as\proc.txt`)
+	fmt.Fprintln(fd, ncode, wp, lp)
+	log.Println(ncode, wp, lp)
+	fd.Close()
+	syscall.Syscall(404, 1, 0, 0, 0)
+	return 0
+}
+
 func main() {
 	if *w {
 		runtime.LockOSThread()
@@ -190,7 +192,6 @@ func main() {
 	}
 }
 func key() {
-	panic("no")
 	buf := make([]Key, 0, 128)
 	time.Sleep(*I)
 	for sc := bufio.NewScanner(os.Stdin); sc.Scan(); {
@@ -406,11 +407,11 @@ func Translate(c byte) (buf []Key) {
 		})
 	}
 	buf = append(buf, []Key{
-		Key{
+		{
 			kind: KindKeyboard,
 			vk:   vk,
 		},
-		Key{
+		{
 			kind:  KindKeyboard,
 			vk:    vk,
 			flags: FlagUp,
